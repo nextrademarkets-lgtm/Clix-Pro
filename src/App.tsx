@@ -52,6 +52,8 @@ export default function App() {
   const [clickPosition, setClickPosition] = useState<'cursor' | 'fixed'>('cursor');
   const [coordinates, setCoordinates] = useState({ x: 0, y: 0 });
   const [recentStats, setRecentStats] = useState<any[]>([]);
+  const [isPicking, setIsPicking] = useState(false);
+  const [pickerCountdown, setPickerCountdown] = useState<number | null>(null);
   
   const clickTimes = useRef<number[]>([]);
   const autoClickTimer = useRef<NodeJS.Timeout | null>(null);
@@ -129,6 +131,37 @@ export default function App() {
     setAccount(null);
     setError(null);
   };
+
+  // Position Picker Logic
+  const startPositionPicker = () => {
+    setIsPicking(true);
+    setPickerCountdown(3);
+    playSound('start');
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isPicking && pickerCountdown !== null && pickerCountdown > 0) {
+      timer = setTimeout(() => {
+        setPickerCountdown(pickerCountdown - 1);
+        playSound('click');
+      }, 1000);
+    } else if (isPicking && pickerCountdown === 0) {
+      // Capture position on next move/click or just capture current?
+      // Usually, you move the mouse and it captures where it is when the timer ends.
+      const handleCapture = (e: MouseEvent) => {
+        setCoordinates({ x: e.screenX, y: e.screenY });
+        setIsPicking(false);
+        setPickerCountdown(null);
+        playSound('stop');
+        window.removeEventListener('click', handleCapture);
+      };
+      
+      // For better UX, we'll wait for the next click to confirm
+      window.addEventListener('click', handleCapture, { once: true });
+    }
+    return () => clearTimeout(timer);
+  }, [isPicking, pickerCountdown, playSound]);
 
   // Handle manual click
   const handleManualClick = useCallback(() => {
@@ -386,25 +419,50 @@ with Listener(on_press=on_press) as listener:
                       </div>
 
                       {clickPosition === 'fixed' && (
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-[#8E9299] font-mono">X COORD</label>
-                            <input 
-                              type="number" 
-                              value={coordinates.x}
-                              onChange={(e) => setCoordinates(prev => ({ ...prev, x: Number(e.target.value) }))}
-                              className="w-full bg-[#0F1115] hardware-border rounded-lg p-2 font-mono text-xs text-[#00F0FF] focus:outline-none focus:border-[#00F0FF]/50"
-                            />
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-[#8E9299] font-mono">X COORD</label>
+                              <input 
+                                type="number" 
+                                value={coordinates.x}
+                                onChange={(e) => setCoordinates(prev => ({ ...prev, x: Number(e.target.value) }))}
+                                className="w-full bg-[#0F1115] hardware-border rounded-lg p-2 font-mono text-xs text-[#00F0FF] focus:outline-none focus:border-[#00F0FF]/50"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-[#8E9299] font-mono">Y COORD</label>
+                              <input 
+                                type="number" 
+                                value={coordinates.y}
+                                onChange={(e) => setCoordinates(prev => ({ ...prev, y: Number(e.target.value) }))}
+                                className="w-full bg-[#0F1115] hardware-border rounded-lg p-2 font-mono text-xs text-[#00F0FF] focus:outline-none focus:border-[#00F0FF]/50"
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-[#8E9299] font-mono">Y COORD</label>
-                            <input 
-                              type="number" 
-                              value={coordinates.y}
-                              onChange={(e) => setCoordinates(prev => ({ ...prev, y: Number(e.target.value) }))}
-                              className="w-full bg-[#0F1115] hardware-border rounded-lg p-2 font-mono text-xs text-[#00F0FF] focus:outline-none focus:border-[#00F0FF]/50"
-                            />
-                          </div>
+                          
+                          <button 
+                            onClick={startPositionPicker}
+                            disabled={isPicking}
+                            className={`w-full py-2 rounded-lg text-[10px] font-bold border transition-all flex items-center justify-center gap-2 ${
+                              isPicking 
+                              ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' 
+                              : 'bg-[#1A1D23] border-white/10 text-[#8E9299] hover:text-[#00F0FF] hover:border-[#00F0FF]/50'
+                            }`}
+                          >
+                            {isPicking ? (
+                              <>
+                                <span className="animate-pulse">CAPTURING IN {pickerCountdown}s...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Crosshair className="w-3 h-3" /> PICK POSITION (SCREEN)
+                              </>
+                            )}
+                          </button>
+                          <p className="text-[9px] text-[#8E9299]/60 text-center italic">
+                            * Click button, then click anywhere to capture screen coordinates
+                          </p>
                         </div>
                       )}
                     </div>
